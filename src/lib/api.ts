@@ -127,31 +127,80 @@ Return only a valid JSON array of up to 5 vendors. Each object must have:
 Return ONLY the JSON array. No markdown, no code fences, no extra text.`;
 }
 
+function normalizeVendor(v: Record<string, unknown>): Vendor {
+  return {
+    name: String(v.name ?? "Fornecedor"),
+    type: String(v.type ?? ""),
+    location: String(v.location ?? ""),
+    website: v.website ? String(v.website) : null,
+    description: String(v.description ?? ""),
+    priceRange: v.priceRange ? String(v.priceRange) : null,
+    rating: v.rating ? String(v.rating) : null,
+  };
+}
+
+/**
+ * Recupera objetos JSON individuais `{...}` de um texto, tolerando vírgulas
+ * finais, texto entre objetos e um array parcialmente malformado.
+ */
+function salvageObjects(text: string): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  let depth = 0;
+  let startIdx = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "{") {
+      if (depth === 0) startIdx = i;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0 && startIdx !== -1) {
+        try {
+          const obj = JSON.parse(text.slice(startIdx, i + 1)) as unknown;
+          if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+            out.push(obj as Record<string, unknown>);
+          }
+        } catch {
+          /* ignora objeto malformado */
+        }
+        startIdx = -1;
+      }
+    }
+  }
+  return out;
+}
+
 /** Extrai o array JSON de fornecedores da resposta do modelo, tolerante a ruído. */
 export function parseVendorResponse(raw: string): Vendor[] {
   let text = raw.trim();
   // Remover eventuais code fences
   text = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
-  // Isolar o primeiro array JSON
+  // Isolar o array JSON (do primeiro "[" ao último "]")
   const start = text.indexOf("[");
   const end = text.lastIndexOf("]");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("Não foi possível interpretar os resultados da pesquisa.");
+  const slice =
+    start !== -1 && end !== -1 && end > start ? text.slice(start, end + 1) : "";
+
+  // 1ª tentativa: parse direto do array.
+  if (slice) {
+    try {
+      const parsed = JSON.parse(slice) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter(
+            (v): v is Record<string, unknown> =>
+              typeof v === "object" && v !== null,
+          )
+          .map(normalizeVendor);
+      }
+    } catch {
+      /* cai para o modo de recuperação */
+    }
   }
-  const slice = text.slice(start, end + 1);
-  const parsed = JSON.parse(slice) as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new Error("Formato de resposta inesperado.");
-  }
-  return parsed
-    .filter((v): v is Record<string, unknown> => typeof v === "object" && v !== null)
-    .map((v) => ({
-      name: String(v.name ?? "Fornecedor"),
-      type: String(v.type ?? ""),
-      location: String(v.location ?? ""),
-      website: v.website ? String(v.website) : null,
-      description: String(v.description ?? ""),
-      priceRange: v.priceRange ? String(v.priceRange) : null,
-      rating: v.rating ? String(v.rating) : null,
-    }));
+
+  // 2ª tentativa: recuperar objetos individuais mesmo com ruído/malformação.
+  const salvaged = salvageObjects(slice || text);
+  if (salvaged.length > 0) return salvaged.map(normalizeVendor);
+
+  throw new Error("Não foi possível interpretar os resultados da pesquisa.");
 }

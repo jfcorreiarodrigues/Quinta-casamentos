@@ -113,7 +113,7 @@ export default function Assistant({ profile, done, plan, goToPlans }: Props) {
   };
 
   return (
-    <div className="flex h-[calc(100vh-180px)] min-h-[460px] flex-col">
+    <div className="flex h-[calc(100dvh-190px)] min-h-[440px] flex-col">
       <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">

@@ -76,7 +76,11 @@ export default function App() {
     persistPlan(plan);
   }, [plan]);
 
-  // Resultado de um checkout Stripe (redirect de volta ao frontend)
+  // Resultado de um checkout Stripe (redirect de volta ao frontend).
+  // ⚠️ FRONTEIRA DE CONFIANÇA (MVP): o plano é ativado a partir do parâmetro de
+  // redirect, que é forjável. Coerente com o modelo client-side deste MVP (o
+  // plano vive no localStorage). Em PRODUÇÃO, a entitlement TEM de ser derivada
+  // no servidor a partir do webhook Stripe + registo do utilizador — nunca do URL.
   useEffect(() => {
     const result = readCheckoutResult();
     if (!result) return;
@@ -271,7 +275,11 @@ export default function App() {
       )}
 
       {toast && (
-        <div className="wp-modal-in fixed inset-x-0 bottom-4 z-50 mx-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-line bg-white px-4 py-3 text-center text-sm font-medium text-ink shadow-lg">
+        <div
+          role="status"
+          aria-live="polite"
+          className="wp-modal-in fixed inset-x-0 bottom-4 z-50 mx-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-line bg-white px-4 py-3 text-center text-sm font-medium text-ink shadow-lg"
+        >
           {toast}
         </div>
       )}
