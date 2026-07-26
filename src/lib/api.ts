@@ -4,7 +4,12 @@ import { monthsLeft } from "./utils";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 // Quando definido (ex: "/api/claude"), as chamadas passam por um proxy
 // server-side e a chave nunca é exposta no browser — modo recomendado em produção.
-const PROXY_URL = import.meta.env.VITE_CLAUDE_PROXY_URL;
+// Em builds de produção assume "/api/claude" por omissão (a função Edge está no
+// repositório), bastando definir ANTHROPIC_API_KEY no servidor. Pode ser
+// desativado com VITE_CLAUDE_PROXY_URL="" para usar a chave direta no cliente.
+const PROXY_URL =
+  import.meta.env.VITE_CLAUDE_PROXY_URL ??
+  (import.meta.env.PROD ? "/api/claude" : undefined);
 
 /** Devolve true se a IA está disponível (via proxy server-side ou chave local). */
 export function hasApiKey(): boolean {
