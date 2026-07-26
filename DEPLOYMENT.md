@@ -11,12 +11,21 @@ O frontend é uma app estática (Vite) e faz deploy direto na Vercel.
 3. A Vercel deteta automaticamente o Vite (`vercel.json` já fixa as definições):
    - **Build Command:** `npm run build`
    - **Output Directory:** `dist`
-4. Em **Settings → Environment Variables**, adicione:
+4. Em **Settings → Environment Variables**, adicione (abordagem **proxy**,
+   recomendada — a chave nunca vai para o browser):
 
-   | Nome                     | Valor                          | Obrigatória                     |
-   | ------------------------ | ------------------------------ | ------------------------------- |
-   | `VITE_ANTHROPIC_API_KEY` | `sk-ant-api03-...`             | Sim (Fornecedores/Assistente)   |
-   | `VITE_STRIPE_API_URL`    | URL público do backend Stripe  | Não (só se usar pagamentos)     |
+   | Nome                    | Valor                         | Notas                                          |
+   | ----------------------- | ----------------------------- | ---------------------------------------------- |
+   | `ANTHROPIC_API_KEY`     | `sk-ant-api03-...`            | **Sem** prefixo `VITE_` — fica só no servidor  |
+   | `VITE_CLAUDE_PROXY_URL` | `/api/claude`                 | Faz o frontend usar a função serverless        |
+   | `VITE_STRIPE_API_URL`   | URL público do backend Stripe | Opcional (só se usar pagamentos)               |
+
+   A função `api/claude.ts` (Edge) já está no repositório: o Vercel deteta-a
+   automaticamente e serve-a em `/api/claude`.
+
+   > Alternativa rápida (**não** recomendada para produção): expor a chave no
+   > cliente com `VITE_ANTHROPIC_API_KEY` e sem proxy. Qualquer visitante a
+   > consegue extrair do bundle.
 
 5. **Deploy.**
 

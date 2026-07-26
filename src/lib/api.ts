@@ -2,10 +2,13 @@ import type { CoupleProfile, Task, Vendor } from "../types";
 import { monthsLeft } from "./utils";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+// Quando definido (ex: "/api/claude"), as chamadas passam por um proxy
+// server-side e a chave nunca é exposta no browser — modo recomendado em produção.
+const PROXY_URL = import.meta.env.VITE_CLAUDE_PROXY_URL;
 
-/** Devolve true se existe uma API key configurada. */
+/** Devolve true se a IA está disponível (via proxy server-side ou chave local). */
 export function hasApiKey(): boolean {
-  return Boolean(import.meta.env.VITE_ANTHROPIC_API_KEY);
+  return Boolean(PROXY_URL || import.meta.env.VITE_ANTHROPIC_API_KEY);
 }
 
 export async function callClaude(
@@ -14,9 +17,9 @@ export async function callClaude(
   useWebSearch = false,
 ): Promise<string> {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  if (!PROXY_URL && !apiKey) {
     throw new Error(
-      "A chave da API Anthropic não está configurada. Defina VITE_ANTHROPIC_API_KEY no ficheiro .env.",
+      "A IA não está configurada. Defina VITE_CLAUDE_PROXY_URL (proxy) ou VITE_ANTHROPIC_API_KEY no ficheiro .env.",
     );
   }
 
@@ -31,18 +34,24 @@ export async function callClaude(
     body.tools = [{ type: "web_search_20250305", name: "web_search" }];
   }
 
-  let response: Response;
-  try {
-    response = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
+  // Via proxy: envia apenas os parâmetros; a chave fica no servidor.
+  // Direto (dev local): usa a chave do browser com o header obrigatório.
+  const url = PROXY_URL || ANTHROPIC_API_URL;
+  const headers: Record<string, string> = PROXY_URL
+    ? { "Content-Type": "application/json" }
+    : {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
         "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify(body),
-    });
+      };
+  const requestBody = PROXY_URL
+    ? JSON.stringify({ messages, system, useWebSearch })
+    : JSON.stringify(body);
+
+  let response: Response;
+  try {
+    response = await fetch(url, { method: "POST", headers, body: requestBody });
   } catch {
     throw new Error(
       "Não foi possível contactar o serviço. Verifique a sua ligação à internet.",
