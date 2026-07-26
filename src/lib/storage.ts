@@ -84,3 +84,68 @@ export function clearAll(): void {
     }
   });
 }
+
+// ── Backup / restauro (exportar/importar todos os dados) ──────────
+const BACKUP_VERSION = 1;
+
+export interface BackupData {
+  app: "wedding-planner-portugal";
+  version: number;
+  exportedAt: string;
+  data: Record<string, unknown>;
+}
+
+/** Serializa todos os dados guardados num objeto de backup. */
+export function exportAll(): BackupData {
+  const data: Record<string, unknown> = {};
+  for (const key of Object.values(KEYS)) {
+    const raw = (() => {
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    })();
+    if (raw !== null) {
+      try {
+        data[key] = JSON.parse(raw);
+      } catch {
+        /* ignora entradas corrompidas */
+      }
+    }
+  }
+  return {
+    app: "wedding-planner-portugal",
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    data,
+  };
+}
+
+/**
+ * Restaura os dados a partir de um objeto de backup. Só aceita chaves conhecidas
+ * (`wp_*`) e valida o formato. Devolve true em caso de sucesso.
+ */
+export function importAll(backup: unknown): boolean {
+  if (
+    !backup ||
+    typeof backup !== "object" ||
+    (backup as BackupData).app !== "wedding-planner-portugal" ||
+    typeof (backup as BackupData).data !== "object"
+  ) {
+    return false;
+  }
+  const known = new Set<string>(Object.values(KEYS));
+  const incoming = (backup as BackupData).data;
+  let wrote = false;
+  for (const [key, value] of Object.entries(incoming)) {
+    if (!known.has(key)) continue;
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      wrote = true;
+    } catch {
+      /* localStorage cheio/indisponível */
+    }
+  }
+  return wrote;
+}

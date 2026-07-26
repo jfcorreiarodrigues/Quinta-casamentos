@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { RotateCcw, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, RotateCcw, Upload, X } from "lucide-react";
 import type { Ceremony, CoupleProfile } from "../types";
 import { monthsLeft } from "../lib/utils";
-import { clearAll } from "../lib/storage";
+import { clearAll, exportAll, importAll } from "../lib/storage";
 import { GhostButton, GoldButton, InfoBox } from "./ui";
 
 interface Props {
@@ -20,6 +20,41 @@ const CEREMONY_OPTIONS: { value: Ceremony; label: string }[] = [
 export default function Settings({ profile, onSave, onClose }: Props) {
   const [draft, setDraft] = useState<CoupleProfile>(profile);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [backupMsg, setBackupMsg] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const exportData = () => {
+    const backup = exportAll();
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const stamp = new Date().toISOString().slice(0, 10);
+    a.download = `wedding-planner-backup-${stamp}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setBackupMsg("Backup exportado. Guarde o ficheiro em local seguro.");
+  };
+
+  const importData = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        if (importAll(parsed)) {
+          setBackupMsg("Dados importados. A recarregar…");
+          setTimeout(() => window.location.reload(), 900);
+        } else {
+          setBackupMsg("Ficheiro de backup inválido.");
+        }
+      } catch {
+        setBackupMsg("Não foi possível ler o ficheiro.");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Fechar com Escape
   useEffect(() => {
@@ -158,6 +193,43 @@ export default function Settings({ profile, onSave, onClose }: Props) {
           <GoldButton onClick={save} disabled={!valid}>
             Guardar alterações
           </GoldButton>
+        </div>
+
+        {/* Backup — exportar / importar */}
+        <div className="mt-6 border-t border-line pt-5">
+          <h3 className="mb-1 text-sm font-semibold text-ink">
+            Backup dos dados
+          </h3>
+          <p className="mb-3 text-xs text-muted">
+            Os dados ficam só neste dispositivo. Exporte um backup para não
+            perder o plano (e para o mover para outro dispositivo).
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <GhostButton onClick={exportData}>
+              <Download size={16} />
+              Exportar dados
+            </GhostButton>
+            <GhostButton onClick={() => fileInput.current?.click()}>
+              <Upload size={16} />
+              Importar dados
+            </GhostButton>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) importData(f);
+                e.target.value = "";
+              }}
+            />
+          </div>
+          {backupMsg && (
+            <p className="mt-2 text-xs font-medium text-gold-deep">
+              {backupMsg}
+            </p>
+          )}
         </div>
 
         {/* Zona de reset */}
