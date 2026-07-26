@@ -88,6 +88,31 @@ export function monthsLabel(byMonth: number, date: string): string {
   return `em ~${Math.round(diff)}m`;
 }
 
+/**
+ * Data-limite real de uma tarefa = data do casamento menos `byMonth` meses.
+ * Devolve null se a data for inválida.
+ */
+export function targetDate(byMonth: number, date: string): Date | null {
+  if (!date) return null;
+  const wedding = new Date(date + "T00:00:00");
+  if (isNaN(wedding.getTime())) return null;
+  const d = new Date(wedding);
+  d.setDate(d.getDate() - Math.round(byMonth * DAYS_PER_MONTH));
+  return d;
+}
+
+/** Rótulo concreto da data-limite, ex: "até 15 set 2026" (ou "" se inválida). */
+export function targetDateLabel(byMonth: number, date: string): string {
+  const d = targetDate(byMonth, date);
+  if (!d) return "";
+  const label = d.toLocaleDateString("pt-PT", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  return `até ${label}`;
+}
+
 /** Gera um id simples único o suficiente para uso local. */
 export function uid(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);

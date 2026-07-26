@@ -5,6 +5,8 @@ import {
   getUrgency,
   monthsLabel,
   monthsLeft,
+  targetDate,
+  targetDateLabel,
 } from "./utils";
 
 // "Agora" fixo para tornar a matemática de datas determinística.
@@ -89,6 +91,23 @@ describe("monthsLabel", () => {
   });
   it("mostra estimativa futura para tarefas a caminho", () => {
     expect(monthsLabel(1, isoInDays(304))).toMatch(/^em ~\d+m$/);
+  });
+});
+
+describe("targetDate / targetDateLabel", () => {
+  it("a data-limite é a data do casamento menos byMonth meses", () => {
+    const wedding = isoInDays(300); // ~9,85 meses adiante
+    const d6 = targetDate(6, wedding)!;
+    const d3 = targetDate(3, wedding)!;
+    // Tarefa devida ao mês 6 tem data-limite mais cedo que a devida ao mês 3.
+    expect(d6.getTime()).toBeLessThan(d3.getTime());
+  });
+  it("o rótulo é concreto e começa por 'até'", () => {
+    expect(targetDateLabel(6, isoInDays(300))).toMatch(/^até /);
+  });
+  it("devolve null / vazio para data inválida", () => {
+    expect(targetDate(6, "")).toBeNull();
+    expect(targetDateLabel(6, "")).toBe("");
   });
 });
 

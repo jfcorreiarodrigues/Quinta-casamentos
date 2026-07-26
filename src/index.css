@@ -221,6 +221,10 @@ input[type="range"] {
 .print-task-text {
   flex: 1;
 }
+.print-note {
+  color: #7a6040;
+  font-style: italic;
+}
 .print-task-meta {
   font-size: 10px;
   color: #9a8a6a;

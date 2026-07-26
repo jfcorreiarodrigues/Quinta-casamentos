@@ -1,7 +1,7 @@
 import type { CoupleProfile } from "../types";
 import { PHASE_NAMES, TASKS } from "../lib/tasks";
-import { daysLeft, fmt, fmtDate, getUrgency, monthsLabel } from "../lib/utils";
-import { getBudgetSpent, getGuests } from "../lib/storage";
+import { daysLeft, fmt, fmtDate, targetDateLabel } from "../lib/utils";
+import { getBudgetSpent, getGuests, getNotes } from "../lib/storage";
 
 const CEREMONY_LABEL: Record<CoupleProfile["ceremony"], string> = {
   civil: "Civil",
@@ -52,6 +52,8 @@ export default function PrintablePlan({
     pendente: guests.filter((x) => x.rsvp === "pendente").length,
     recusado: guests.filter((x) => x.rsvp === "recusado").length,
   };
+
+  const notes = getNotes();
 
   return (
     <div className="print-area">
@@ -135,20 +137,21 @@ export default function PrintablePlan({
               <ul className="print-tasks">
                 {tasks.map((t) => {
                   const isDone = !!done[t.id];
-                  const urgency = getUrgency(t.byMonth, profile.date, isDone);
+                  const note = notes[t.id];
                   return (
                     <li key={t.id} className={isDone ? "is-done" : ""}>
                       <span className="print-check">{isDone ? "☑" : "☐"}</span>
                       <span className="print-task-text">
                         {t.icon} {t.text}
+                        {note && (
+                          <span className="print-note"> — {note}</span>
+                        )}
                       </span>
                       <span className="print-task-meta">
                         {t.cat} ·{" "}
                         {isDone
                           ? "concluída"
-                          : urgency === "overdue"
-                            ? monthsLabel(t.byMonth, profile.date)
-                            : monthsLabel(t.byMonth, profile.date)}
+                          : targetDateLabel(t.byMonth, profile.date)}
                       </span>
                     </li>
                   );
