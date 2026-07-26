@@ -32,6 +32,7 @@ import Vendors from "./components/Vendors";
 import Assistant from "./components/Assistant";
 import Plans from "./components/Plans";
 import Settings from "./components/Settings";
+import PrintablePlan from "./components/PrintablePlan";
 
 export type View =
   | "dashboard"
@@ -273,6 +274,9 @@ export default function App() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
+
+      {/* Vista de impressão (oculta no ecrã, visível em PDF/print) */}
+      <PrintablePlan profile={profile} done={done} />
 
       {toast && (
         <div

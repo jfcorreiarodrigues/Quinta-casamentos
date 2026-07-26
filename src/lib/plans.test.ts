@@ -29,6 +29,12 @@ describe("canAccess", () => {
       expect(canAccess(f, "premium")).toBe(true);
     }
   });
+
+  it("reserva a exportação PDF apenas para o plano premium", () => {
+    expect(canAccess("pdfExport", "free")).toBe(false);
+    expect(canAccess("pdfExport", "pro")).toBe(false);
+    expect(canAccess("pdfExport", "premium")).toBe(true);
+  });
 });
 
 describe("dashboardSectionLimit", () => {

@@ -48,6 +48,8 @@ export function canAccess(feature: PlanFeature, plan: Plan): boolean {
       return cfg.aiMessageLimit > 0;
     case "guestsUnlimited":
       return cfg.guestLimit === Infinity;
+    case "pdfExport":
+      return plan === "premium";
     default:
       return false;
   }
