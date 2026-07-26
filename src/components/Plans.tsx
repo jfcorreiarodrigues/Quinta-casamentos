@@ -1,7 +1,9 @@
-import { Check, Sparkles, X } from "lucide-react";
+import { useState } from "react";
+import { Check, Loader2, Sparkles, X } from "lucide-react";
 import type { Plan } from "../types";
 import { FEATURE_MATRIX, PLANS, PLAN_ORDER } from "../lib/plans";
-import { GhostButton, GoldButton } from "./ui";
+import { isStripeEnabled, startCheckout } from "../lib/billing";
+import { GhostButton, GoldButton, InfoBox } from "./ui";
 
 interface Props {
   plan: Plan;
@@ -15,6 +17,27 @@ const TAGLINES: Record<Plan, string> = {
 };
 
 export default function Plans({ plan, onSelect }: Props) {
+  const stripeOn = isStripeEnabled();
+  const [loadingPlan, setLoadingPlan] = useState<Plan | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const choose = async (id: Plan) => {
+    setError(null);
+    // Downgrade para grátis ou modo MVP → troca imediata.
+    if (id === "free" || !stripeOn) {
+      onSelect(id);
+      return;
+    }
+    // Plano pago com Stripe ativo → redireciona para o checkout.
+    try {
+      setLoadingPlan(id);
+      await startCheckout(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao iniciar o pagamento.");
+      setLoadingPlan(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="text-center">
@@ -109,13 +132,22 @@ export default function Plans({ plan, onSelect }: Props) {
                   Plano atual
                 </GhostButton>
               ) : (
-                <GoldButton className="w-full" onClick={() => onSelect(id)}>
-                  {cfg.price === 0 ? (
+                <GoldButton
+                  className="w-full"
+                  onClick={() => choose(id)}
+                  disabled={loadingPlan !== null}
+                >
+                  {loadingPlan === id ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      A redirecionar…
+                    </>
+                  ) : cfg.price === 0 ? (
                     "Mudar para Básico"
                   ) : (
                     <>
                       <Sparkles size={16} />
-                      Escolher {cfg.name}
+                      {stripeOn ? `Subscrever ${cfg.name}` : `Escolher ${cfg.name}`}
                     </>
                   )}
                 </GoldButton>
@@ -125,9 +157,12 @@ export default function Plans({ plan, onSelect }: Props) {
         })}
       </div>
 
+      {error && <InfoBox tone="warn">{error}</InfoBox>}
+
       <p className="text-center text-xs text-muted">
-        MVP — a mudança de plano é imediata e não implica pagamento real. A
-        integração com Stripe fica reservada para a versão de produção.
+        {stripeOn
+          ? "Pagamento seguro processado pela Stripe. Pode cancelar a subscrição a qualquer momento."
+          : "MVP — a mudança de plano é imediata e não implica pagamento real. A integração com Stripe é ativada ao definir VITE_STRIPE_API_URL."}
       </p>
     </div>
   );

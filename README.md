@@ -45,6 +45,17 @@ Abra http://localhost:5173.
 Todos os dados ficam apenas no `localStorage` do dispositivo (sem backend neste
 MVP). Ver `src/lib/storage.ts`.
 
+## Pagamentos (opcional)
+
+Os planos pagos podem ser processados via Stripe Checkout. O backend Express
+está em [`server/`](./server/README.md). Sem `VITE_STRIPE_API_URL` definida, a
+app troca de plano localmente (modo MVP, sem pagamento real).
+
+## Deployment
+
+Instruções de deploy do frontend (Vercel) e do backend em
+[`DEPLOYMENT.md`](./DEPLOYMENT.md).
+
 ## Segurança
 
 Neste MVP a API key da Anthropic é usada diretamente no frontend. Para produção,

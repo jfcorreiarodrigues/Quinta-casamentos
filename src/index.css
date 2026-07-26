@@ -48,6 +48,55 @@ input[type="range"] {
   accent-color: var(--gold-primary);
 }
 
+/* Animações subtis */
+@keyframes wp-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.wp-fade-in {
+  animation: wp-fade-in 0.35s ease-out;
+}
+
+@keyframes wp-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.wp-overlay-in {
+  animation: wp-overlay-in 0.2s ease-out;
+}
+
+@keyframes wp-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.wp-modal-in {
+  animation: wp-modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wp-fade-in,
+  .wp-overlay-in,
+  .wp-modal-in {
+    animation: none;
+  }
+}
+
 /* Input reutilizável */
 .wp-input {
   width: 100%;
