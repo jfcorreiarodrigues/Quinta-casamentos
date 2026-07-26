@@ -14,11 +14,11 @@ import {
   fmt,
   fmtDate,
   getUrgency,
-  monthsLabel,
+  targetDateLabel,
   urgencyMeta,
 } from "../lib/utils";
 import { dashboardSectionLimit } from "../lib/plans";
-import { ProgressBar, StatCard, UpgradeCTA } from "./ui";
+import { InfoBox, ProgressBar, StatCard, UpgradeCTA } from "./ui";
 
 interface Props {
   profile: CoupleProfile;
@@ -69,7 +69,11 @@ export default function Dashboard({
 
   const doneCount = TASKS.filter((t) => done[t.id]).length;
   const progress = Math.round((doneCount / TASKS.length) * 100);
-  const limit = dashboardSectionLimit(plan);
+  const baseLimit = dashboardSectionLimit(plan);
+  // Nunca esconder tarefas atrasadas atrás do paywall — são as mais críticas.
+  const limitFor = (u: Urgency) => (u === "overdue" ? Infinity : baseLimit);
+  // Muitas atrasadas costuma significar pouco tempo de antecedência.
+  const showRunwayNote = grouped.overdue.length >= 8;
 
   return (
     <div className="space-y-6">
@@ -158,13 +162,23 @@ export default function Dashboard({
         />
       </div>
 
+      {/* Nota empática quando há pouco tempo até à data */}
+      {showRunwayNote && (
+        <InfoBox tone="warn">
+          Começaste com pouco tempo até à data, por isso várias tarefas de
+          arranque surgem já como prioritárias. Não entres em pânico: ataca
+          primeiro as marcadas a vermelho, decide o essencial (espaço, catering,
+          fotógrafo) e delega ou simplifica o resto.
+        </InfoBox>
+      )}
+
       {/* Secções por urgência */}
       <div className="space-y-4">
         {SECTION_ORDER.map((u) => {
           const tasks = grouped[u];
           if (tasks.length === 0) return null;
           const meta = urgencyMeta[u];
-          const visible = tasks.slice(0, limit);
+          const visible = tasks.slice(0, limitFor(u));
           const hidden = tasks.length - visible.length;
 
           return (
@@ -273,7 +287,7 @@ function TaskRow({
           className="shrink-0 whitespace-nowrap text-xs font-medium"
           style={{ color: meta.color }}
         >
-          {monthsLabel(task.byMonth, date)}
+          {targetDateLabel(task.byMonth, date)}
         </span>
       )}
     </li>

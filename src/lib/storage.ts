@@ -10,6 +10,7 @@ const KEYS = {
   vendorCount: "wp_vendor_count",
   aiCount: "wp_ai_count",
   vendorSaved: "wp_vendor_saved",
+  notes: "wp_notes",
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -66,6 +67,12 @@ export const setAiCount = (n: number): void => write(KEYS.aiCount, n);
 export const getVendorSaved = (): Vendor[] =>
   read<Vendor[]>(KEYS.vendorSaved, []);
 export const setVendorSaved = (v: Vendor[]): void => write(KEYS.vendorSaved, v);
+
+// ── Notas por tarefa ──────────────────────────────────────────────
+export const getNotes = (): Record<string, string> =>
+  read<Record<string, string>>(KEYS.notes, {});
+export const setNotes = (n: Record<string, string>): void =>
+  write(KEYS.notes, n);
 
 /** Limpa todos os dados da aplicação (usado em reset). */
 export function clearAll(): void {

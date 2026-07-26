@@ -76,11 +76,13 @@ export default function Vendors({ profile, plan, goToPlans }: Props) {
     );
   }
 
-  const search = async () => {
+  const search = async (categoryOverride?: string) => {
     if (loading || outOfSearches) return;
+    const cat = categoryOverride ?? category;
+    if (categoryOverride) setCategory(categoryOverride);
     if (!hasApiKey()) {
       setError(
-        "A chave da API Anthropic não está configurada. Defina VITE_ANTHROPIC_API_KEY no ficheiro .env.",
+        "A pesquisa de fornecedores precisa da IA configurada (proxy /api/claude com ANTHROPIC_API_KEY, ou VITE_ANTHROPIC_API_KEY em dev).",
       );
       return;
     }
@@ -88,7 +90,7 @@ export default function Vendors({ profile, plan, goToPlans }: Props) {
     setError(null);
     setResults(null);
     try {
-      const prompt = buildVendorSearchPrompt(category, query, profile.city);
+      const prompt = buildVendorSearchPrompt(cat, query, profile.city);
       const raw = await callClaude(
         [{ role: "user", content: prompt }],
         "És um assistente que devolve exclusivamente JSON válido, sem texto adicional.",
@@ -154,7 +156,10 @@ export default function Vendors({ profile, plan, goToPlans }: Props) {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && search()}
           />
-          <GoldButton onClick={search} disabled={loading || outOfSearches}>
+          <GoldButton
+            onClick={() => void search()}
+            disabled={loading || outOfSearches}
+          >
             {loading ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
@@ -184,6 +189,36 @@ export default function Vendors({ profile, plan, goToPlans }: Props) {
           <Loader2 size={18} className="animate-spin" />
           A consultar o mercado português…
         </div>
+      )}
+
+      {/* Empty state — antes da primeira pesquisa */}
+      {!results && !loading && !error && (
+        <section className="rounded-2xl border border-dashed border-line bg-white/60 p-6 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gold-primary/15 text-gold-dark">
+            <Search size={20} />
+          </div>
+          <h2 className="font-display text-lg font-semibold text-ink">
+            Comece a sua pesquisa
+          </h2>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
+            Escolha uma categoria e pesquisamos fornecedores reais no mercado
+            português. Sugestões para começar:
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {["Quinta / Espaço", "Fotógrafo", "Catering", "DJ / Banda"].map(
+              (c) => (
+                <button
+                  key={c}
+                  onClick={() => void search(c)}
+                  disabled={outOfSearches}
+                  className="rounded-full border border-line bg-cream px-3 py-1.5 text-sm text-gold-deep transition-colors hover:border-gold-primary/50 hover:bg-gold-primary/10 disabled:opacity-50"
+                >
+                  {c}
+                </button>
+              ),
+            )}
+          </div>
+        </section>
       )}
 
       {/* Resultados */}

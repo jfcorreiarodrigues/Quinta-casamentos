@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, UserPlus } from "lucide-react";
+import { Download, Plus, Trash2, UserPlus } from "lucide-react";
 import type { Diet, Guest, GuestSide, Plan, RSVP } from "../types";
 import { uid } from "../lib/utils";
 import { PLANS } from "../lib/plans";
 import { getGuests, setGuests as persistGuests } from "../lib/storage";
-import { GoldButton, StatCard, UpgradeCTA } from "./ui";
+import { GhostButton, GoldButton, StatCard, UpgradeCTA } from "./ui";
 
 interface Props {
   plan: Plan;
@@ -106,15 +106,47 @@ export default function Guests({ plan, goToPlans }: Props) {
       prev.map((g) => (g.id === id ? { ...g, rsvp: r } : g)),
     );
 
+  const exportCsv = () => {
+    if (guests.length === 0) return;
+    const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
+    const header = ["Nome", "Lado", "RSVP", "Dieta", "Mesa"];
+    const rows = guests.map((g) =>
+      [
+        g.name,
+        SIDE_LABEL[g.side],
+        RSVP_LABEL[g.rsvp],
+        DIET_LABEL[g.diet],
+        g.table,
+      ]
+        .map((v) => esc(String(v ?? "")))
+        .join(","),
+    );
+    // BOM para acentos abrirem bem no Excel.
+    const csv = "﻿" + [header.map(esc).join(","), ...rows].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "convidados.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-2xl font-semibold text-ink">
-          Convidados
-        </h1>
-        <p className="text-sm text-muted">
-          Faça a gestão da lista e das confirmações (RSVP).
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-ink">
+            Convidados
+          </h1>
+          <p className="text-sm text-muted">
+            Faça a gestão da lista e das confirmações (RSVP).
+          </p>
+        </div>
+        <GhostButton onClick={exportCsv} disabled={guests.length === 0}>
+          <Download size={16} />
+          Exportar CSV
+        </GhostButton>
       </header>
 
       {/* Stats */}
