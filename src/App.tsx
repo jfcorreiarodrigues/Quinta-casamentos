@@ -6,6 +6,7 @@ import {
   Menu,
   MessageCircle,
   Search,
+  Settings as SettingsIcon,
   Sparkles,
   Users,
   Wallet,
@@ -20,6 +21,7 @@ import {
   setProfile as persistProfile,
 } from "./lib/storage";
 import { daysLeft, fmtDate } from "./lib/utils";
+import { clearCheckoutParams, readCheckoutResult } from "./lib/billing";
 import { PlanBadge } from "./components/ui";
 import Onboarding from "./components/Onboarding";
 import Dashboard from "./components/Dashboard";
@@ -29,6 +31,8 @@ import Guests from "./components/Guests";
 import Vendors from "./components/Vendors";
 import Assistant from "./components/Assistant";
 import Plans from "./components/Plans";
+import Settings from "./components/Settings";
+import PrintablePlan from "./components/PrintablePlan";
 
 export type View =
   | "dashboard"
@@ -59,6 +63,8 @@ export default function App() {
   const [plan, setPlanState] = useState<Plan>(() => getPlan());
   const [view, setView] = useState<View>("dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   // Persistência reativa
   useEffect(() => {
@@ -70,6 +76,30 @@ export default function App() {
   useEffect(() => {
     persistPlan(plan);
   }, [plan]);
+
+  // Resultado de um checkout Stripe (redirect de volta ao frontend).
+  // ⚠️ FRONTEIRA DE CONFIANÇA (MVP): o plano é ativado a partir do parâmetro de
+  // redirect, que é forjável. Coerente com o modelo client-side deste MVP (o
+  // plano vive no localStorage). Em PRODUÇÃO, a entitlement TEM de ser derivada
+  // no servidor a partir do webhook Stripe + registo do utilizador — nunca do URL.
+  useEffect(() => {
+    const result = readCheckoutResult();
+    if (!result) return;
+    if (result.status === "success" && result.plan) {
+      setPlanState(result.plan);
+      setToast(`Subscrição ativada! Bem-vindo ao plano ${result.plan === "pro" ? "Pro" : "Premium"}. 🎉`);
+    } else if (result.status === "cancel") {
+      setToast("Pagamento cancelado. O seu plano mantém-se inalterado.");
+    }
+    clearCheckoutParams();
+  }, []);
+
+  // Auto-fechar o toast
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(id);
+  }, [toast]);
 
   const toggleTask = (id: string) =>
     setDoneState((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -125,6 +155,14 @@ export default function App() {
               title="Ver planos"
             >
               <PlanBadge plan={plan} />
+            </button>
+            <button
+              className="rounded-lg p-2 text-ink hover:bg-cream"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Definições"
+              title="Definições"
+            >
+              <SettingsIcon size={19} />
             </button>
             <button
               className="rounded-lg p-2 text-ink hover:bg-cream sm:hidden"
@@ -187,7 +225,7 @@ export default function App() {
       </header>
 
       {/* Conteúdo */}
-      <main className="mx-auto max-w-[860px] px-4 py-6">
+      <main key={view} className="wp-fade-in mx-auto max-w-[860px] px-4 py-6">
         {view === "dashboard" && (
           <Dashboard {...commonProps} onNavigate={setView} />
         )}
@@ -228,6 +266,27 @@ export default function App() {
           Wedding Planner Portugal · Dados guardados apenas neste dispositivo.
         </p>
       </footer>
+
+      {settingsOpen && (
+        <Settings
+          profile={profile}
+          onSave={setProfileState}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {/* Vista de impressão (oculta no ecrã, visível em PDF/print) */}
+      <PrintablePlan profile={profile} done={done} />
+
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="wp-modal-in fixed inset-x-0 bottom-4 z-50 mx-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-line bg-white px-4 py-3 text-center text-sm font-medium text-ink shadow-lg"
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

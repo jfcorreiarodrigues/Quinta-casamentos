@@ -44,7 +44,8 @@ export type PlanFeature =
   | "budgetCategories"
   | "vendors"
   | "assistant"
-  | "guestsUnlimited";
+  | "guestsUnlimited"
+  | "pdfExport";
 
 // ── Convidados ────────────────────────────────────────────────────
 export type GuestSide = "noiva" | "noivo" | "ambos";

@@ -33,17 +33,37 @@ Abra http://localhost:5173.
 
 ## Scripts
 
-| Comando           | Descrição                       |
-| ----------------- | ------------------------------- |
-| `npm run dev`     | Servidor de desenvolvimento     |
-| `npm run build`   | Build de produção               |
-| `npm run preview` | Pré-visualizar o build          |
-| `npm run lint`    | ESLint                          |
+| Comando            | Descrição                       |
+| ------------------ | ------------------------------- |
+| `npm run dev`      | Servidor de desenvolvimento     |
+| `npm run build`    | Build de produção               |
+| `npm run preview`  | Pré-visualizar o build          |
+| `npm run lint`     | ESLint                          |
+| `npm test`         | Testes (Vitest)                 |
+| `npm run test:watch` | Testes em modo watch          |
+
+## Testes & CI
+
+Testes unitários com [Vitest](https://vitest.dev) sobre a lógica crítica
+(urgência/datas em `utils`, limites de plano em `plans`, parsing de fornecedores
+em `api`). O workflow em `.github/workflows/ci.yml` corre **lint + testes +
+build** em cada push para `main` e em cada Pull Request.
 
 ## Persistência
 
 Todos os dados ficam apenas no `localStorage` do dispositivo (sem backend neste
 MVP). Ver `src/lib/storage.ts`.
+
+## Pagamentos (opcional)
+
+Os planos pagos podem ser processados via Stripe Checkout. O backend Express
+está em [`server/`](./server/README.md). Sem `VITE_STRIPE_API_URL` definida, a
+app troca de plano localmente (modo MVP, sem pagamento real).
+
+## Deployment
+
+Instruções de deploy do frontend (Vercel) e do backend em
+[`DEPLOYMENT.md`](./DEPLOYMENT.md).
 
 ## Segurança
 

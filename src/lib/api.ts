@@ -2,10 +2,18 @@ import type { CoupleProfile, Task, Vendor } from "../types";
 import { monthsLeft } from "./utils";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+// Quando definido (ex: "/api/claude"), as chamadas passam por um proxy
+// server-side e a chave nunca é exposta no browser — modo recomendado em produção.
+// Em builds de produção assume "/api/claude" por omissão (a função Edge está no
+// repositório), bastando definir ANTHROPIC_API_KEY no servidor. Pode ser
+// desativado com VITE_CLAUDE_PROXY_URL="" para usar a chave direta no cliente.
+const PROXY_URL =
+  import.meta.env.VITE_CLAUDE_PROXY_URL ??
+  (import.meta.env.PROD ? "/api/claude" : undefined);
 
-/** Devolve true se existe uma API key configurada. */
+/** Devolve true se a IA está disponível (via proxy server-side ou chave local). */
 export function hasApiKey(): boolean {
-  return Boolean(import.meta.env.VITE_ANTHROPIC_API_KEY);
+  return Boolean(PROXY_URL || import.meta.env.VITE_ANTHROPIC_API_KEY);
 }
 
 export async function callClaude(
@@ -14,9 +22,9 @@ export async function callClaude(
   useWebSearch = false,
 ): Promise<string> {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  if (!PROXY_URL && !apiKey) {
     throw new Error(
-      "A chave da API Anthropic não está configurada. Defina VITE_ANTHROPIC_API_KEY no ficheiro .env.",
+      "A IA não está configurada. Defina VITE_CLAUDE_PROXY_URL (proxy) ou VITE_ANTHROPIC_API_KEY no ficheiro .env.",
     );
   }
 
@@ -31,18 +39,24 @@ export async function callClaude(
     body.tools = [{ type: "web_search_20250305", name: "web_search" }];
   }
 
-  let response: Response;
-  try {
-    response = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
+  // Via proxy: envia apenas os parâmetros; a chave fica no servidor.
+  // Direto (dev local): usa a chave do browser com o header obrigatório.
+  const url = PROXY_URL || ANTHROPIC_API_URL;
+  const headers: Record<string, string> = PROXY_URL
+    ? { "Content-Type": "application/json" }
+    : {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
         "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify(body),
-    });
+      };
+  const requestBody = PROXY_URL
+    ? JSON.stringify({ messages, system, useWebSearch })
+    : JSON.stringify(body);
+
+  let response: Response;
+  try {
+    response = await fetch(url, { method: "POST", headers, body: requestBody });
   } catch {
     throw new Error(
       "Não foi possível contactar o serviço. Verifique a sua ligação à internet.",
@@ -127,31 +141,80 @@ Return only a valid JSON array of up to 5 vendors. Each object must have:
 Return ONLY the JSON array. No markdown, no code fences, no extra text.`;
 }
 
+function normalizeVendor(v: Record<string, unknown>): Vendor {
+  return {
+    name: String(v.name ?? "Fornecedor"),
+    type: String(v.type ?? ""),
+    location: String(v.location ?? ""),
+    website: v.website ? String(v.website) : null,
+    description: String(v.description ?? ""),
+    priceRange: v.priceRange ? String(v.priceRange) : null,
+    rating: v.rating ? String(v.rating) : null,
+  };
+}
+
+/**
+ * Recupera objetos JSON individuais `{...}` de um texto, tolerando vírgulas
+ * finais, texto entre objetos e um array parcialmente malformado.
+ */
+function salvageObjects(text: string): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  let depth = 0;
+  let startIdx = -1;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "{") {
+      if (depth === 0) startIdx = i;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0 && startIdx !== -1) {
+        try {
+          const obj = JSON.parse(text.slice(startIdx, i + 1)) as unknown;
+          if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+            out.push(obj as Record<string, unknown>);
+          }
+        } catch {
+          /* ignora objeto malformado */
+        }
+        startIdx = -1;
+      }
+    }
+  }
+  return out;
+}
+
 /** Extrai o array JSON de fornecedores da resposta do modelo, tolerante a ruído. */
 export function parseVendorResponse(raw: string): Vendor[] {
   let text = raw.trim();
   // Remover eventuais code fences
   text = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
-  // Isolar o primeiro array JSON
+  // Isolar o array JSON (do primeiro "[" ao último "]")
   const start = text.indexOf("[");
   const end = text.lastIndexOf("]");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("Não foi possível interpretar os resultados da pesquisa.");
+  const slice =
+    start !== -1 && end !== -1 && end > start ? text.slice(start, end + 1) : "";
+
+  // 1ª tentativa: parse direto do array.
+  if (slice) {
+    try {
+      const parsed = JSON.parse(slice) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter(
+            (v): v is Record<string, unknown> =>
+              typeof v === "object" && v !== null,
+          )
+          .map(normalizeVendor);
+      }
+    } catch {
+      /* cai para o modo de recuperação */
+    }
   }
-  const slice = text.slice(start, end + 1);
-  const parsed = JSON.parse(slice) as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new Error("Formato de resposta inesperado.");
-  }
-  return parsed
-    .filter((v): v is Record<string, unknown> => typeof v === "object" && v !== null)
-    .map((v) => ({
-      name: String(v.name ?? "Fornecedor"),
-      type: String(v.type ?? ""),
-      location: String(v.location ?? ""),
-      website: v.website ? String(v.website) : null,
-      description: String(v.description ?? ""),
-      priceRange: v.priceRange ? String(v.priceRange) : null,
-      rating: v.rating ? String(v.rating) : null,
-    }));
+
+  // 2ª tentativa: recuperar objetos individuais mesmo com ruído/malformação.
+  const salvaged = salvageObjects(slice || text);
+  if (salvaged.length > 0) return salvaged.map(normalizeVendor);
+
+  throw new Error("Não foi possível interpretar os resultados da pesquisa.");
 }

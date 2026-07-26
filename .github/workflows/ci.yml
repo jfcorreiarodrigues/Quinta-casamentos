@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancela execuções anteriores do mesmo ref quando há um novo push.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Lint · Testes · Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Testes
+        run: npm test
+
+      - name: Build
+        run: npm run build

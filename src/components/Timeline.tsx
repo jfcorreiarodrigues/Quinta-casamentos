@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Download, Sparkles } from "lucide-react";
 import type { CoupleProfile, Plan, Task } from "../types";
 import { PHASE_NAMES, TASKS } from "../lib/tasks";
 import { getUrgency, monthsLabel } from "../lib/utils";
-import { PLANS } from "../lib/plans";
-import { LockOverlay, ProgressBar, UrgencyBadge } from "./ui";
+import { canAccess, PLANS } from "../lib/plans";
+import { GhostButton, LockOverlay, ProgressBar, UrgencyBadge } from "./ui";
 
 interface Props {
   profile: CoupleProfile;
@@ -25,16 +25,36 @@ export default function Timeline({
 }: Props) {
   const [open, setOpen] = useState<Record<number, boolean>>({ 1: true });
   const unlockedPhases = PLANS[plan].timelinePhases;
+  const canExport = canAccess("pdfExport", plan);
+
+  const exportPdf = () => {
+    if (canExport) {
+      window.print();
+    } else {
+      goToPlans();
+    }
+  };
 
   return (
     <div className="space-y-4">
-      <header>
-        <h1 className="font-display text-2xl font-semibold text-ink">
-          Plano completo
-        </h1>
-        <p className="text-sm text-muted">
-          As 36 etapas do seu casamento, organizadas em 5 fases.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-ink">
+            Plano completo
+          </h1>
+          <p className="text-sm text-muted">
+            As 36 etapas do seu casamento, organizadas em 5 fases.
+          </p>
+        </div>
+        <GhostButton onClick={exportPdf} title="Exportar o plano em PDF">
+          {canExport ? <Download size={16} /> : <Sparkles size={16} />}
+          Exportar PDF
+          {!canExport && (
+            <span className="ml-1 rounded-full bg-gold-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-gold-deep">
+              Premium
+            </span>
+          )}
+        </GhostButton>
       </header>
 
       {PHASES.map((phase) => {
