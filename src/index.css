@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gold-primary: #c9a96e;
+  --gold-dark: #a0785a;
+  --gold-deep: #7a6040;
+  --overdue: #c97b8a;
+  --urgent: #d4855a;
+  --soon: #b8993a;
+  --upcoming: #6b8cae;
+  --done: #7a9e7e;
+  --bg: #faf7f2;
+  --white: #ffffff;
+  --text: #2a2118;
+  --muted: #9a8a6a;
+  --border: #ede5d5;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Scrollbar discreta para a navbar em mobile */
+.tabs-scroll::-webkit-scrollbar {
+  height: 0;
+}
+.tabs-scroll {
+  scrollbar-width: none;
+}
+
+/* Range input dourado */
+input[type="range"] {
+  accent-color: var(--gold-primary);
+}
+
+/* Input reutilizável */
+.wp-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.wp-input:focus {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.15);
+}
