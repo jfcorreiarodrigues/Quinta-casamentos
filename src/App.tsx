@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import {
   Calendar,
   LayoutGrid,
   ListChecks,
+  Loader2,
   Menu,
   MessageCircle,
   Search,
@@ -13,16 +15,23 @@ import {
 } from "lucide-react";
 import type { CoupleProfile, Plan } from "./types";
 import {
+  clearAll,
+  exportAll,
   getDone,
   getPlan,
   getProfile,
+  importAll,
   setDone as persistDone,
   setPlan as persistPlan,
   setProfile as persistProfile,
+  setSyncSuspended,
 } from "./lib/storage";
 import { daysLeft, fmtDate } from "./lib/utils";
 import { clearCheckoutParams, readCheckoutResult } from "./lib/billing";
+import { getSupabase, isCloudEnabled } from "./lib/supabase";
+import { pullState, pushState } from "./lib/sync";
 import { PlanBadge } from "./components/ui";
+import Auth from "./components/Auth";
 import Onboarding from "./components/Onboarding";
 import Dashboard from "./components/Dashboard";
 import Timeline from "./components/Timeline";
@@ -53,7 +62,13 @@ const NAV: { id: View; label: string; icon: typeof LayoutGrid }[] = [
   { id: "plans", label: "Planos", icon: Sparkles },
 ];
 
-export default function App() {
+function AppMain({
+  userId,
+  onSignOut,
+}: {
+  userId: string | null;
+  onSignOut: (() => void) | null;
+}) {
   const [profile, setProfileState] = useState<CoupleProfile | null>(() =>
     getProfile(),
   );
@@ -76,6 +91,25 @@ export default function App() {
   useEffect(() => {
     persistPlan(plan);
   }, [plan]);
+
+  // Sincronização na cloud: em cada mudança de dados, faz push (com debounce).
+  useEffect(() => {
+    if (!userId) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onChange = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        pushState(userId, exportAll().data as Record<string, unknown>).catch(
+          (e) => console.warn("Falha ao sincronizar:", e),
+        );
+      }, 800);
+    };
+    window.addEventListener("wp:changed", onChange);
+    return () => {
+      window.removeEventListener("wp:changed", onChange);
+      clearTimeout(timer);
+    };
+  }, [userId]);
 
   // Resultado de um checkout Stripe (redirect de volta ao frontend).
   // ⚠️ FRONTEIRA DE CONFIANÇA (MVP): o plano é ativado a partir do parâmetro de
@@ -263,7 +297,10 @@ export default function App() {
           {profile.city}
         </div>
         <p className="mt-2">
-          Wedding Planner Portugal · Dados guardados apenas neste dispositivo.
+          Wedding Planner Portugal ·{" "}
+          {userId
+            ? "Dados sincronizados na sua conta."
+            : "Dados guardados apenas neste dispositivo."}
         </p>
       </footer>
 
@@ -272,6 +309,7 @@ export default function App() {
           profile={profile}
           onSave={setProfileState}
           onClose={() => setSettingsOpen(false)}
+          onSignOut={onSignOut}
         />
       )}
 
@@ -289,4 +327,94 @@ export default function App() {
       )}
     </div>
   );
+}
+
+// ── Ecrã de carregamento ──────────────────────────────────────────
+function FullLoader({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-cream text-muted">
+      <span className="text-3xl">💍</span>
+      <div className="flex items-center gap-2 text-sm">
+        <Loader2 size={16} className="animate-spin" />
+        {label}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Gere autenticação e sincronização quando a cloud está configurada:
+ * carrega a sessão, mostra o login, e hidrata o estado a partir da cloud antes
+ * de montar a app (para que os componentes leiam já os dados sincronizados).
+ */
+function CloudGate() {
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const sb = getSupabase();
+    if (!sb) return;
+    sb.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = sb.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (!s) setHydrated(false);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session || hydrated) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setSyncSuspended(true);
+        const remote = await pullState(session.user.id);
+        if (remote) {
+          // Cloud é a fonte de verdade: substitui o estado local.
+          clearAll();
+          importAll({
+            app: "wedding-planner-portugal",
+            version: 1,
+            exportedAt: "",
+            data: remote,
+          });
+        } else {
+          // Primeira vez: envia eventuais dados locais para a cloud.
+          const local = exportAll().data as Record<string, unknown>;
+          if (Object.keys(local).length > 0) {
+            await pushState(session.user.id, local);
+          }
+        }
+      } catch (e) {
+        console.warn("Falha ao sincronizar o plano:", e);
+      } finally {
+        setSyncSuspended(false);
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session, hydrated]);
+
+  if (session === undefined) return <FullLoader label="A carregar…" />;
+  if (session === null) return <Auth />;
+  if (!hydrated) return <FullLoader label="A sincronizar o seu plano…" />;
+
+  const sb = getSupabase();
+  return (
+    <AppMain
+      key={session.user.id}
+      userId={session.user.id}
+      onSignOut={sb ? () => void sb.auth.signOut() : null}
+    />
+  );
+}
+
+export default function App() {
+  // Sem cloud configurada, corre em modo local (localStorage), sem login.
+  if (!isCloudEnabled()) {
+    return <AppMain userId={null} onSignOut={null} />;
+  }
+  return <CloudGate />;
 }
