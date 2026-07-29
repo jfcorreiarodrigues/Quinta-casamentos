@@ -23,9 +23,22 @@ function read<T>(key: string, fallback: T): T {
   }
 }
 
+// Enquanto true, os writes não emitem o evento de mudança (usado durante a
+// hidratação a partir da cloud, para evitar um push imediato de volta).
+let syncSuspended = false;
+export const setSyncSuspended = (v: boolean): void => {
+  syncSuspended = v;
+};
+
+function notifyChanged(): void {
+  if (syncSuspended || typeof window === "undefined") return;
+  window.dispatchEvent(new Event("wp:changed"));
+}
+
 function write<T>(key: string, value: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    notifyChanged();
   } catch {
     // localStorage cheio ou indisponível — degradação graciosa.
     console.warn("Não foi possível guardar em localStorage:", key);

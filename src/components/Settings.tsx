@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, RotateCcw, Upload, X } from "lucide-react";
+import { Download, LogOut, RotateCcw, Upload, X } from "lucide-react";
 import type { Ceremony, CoupleProfile } from "../types";
 import { monthsLeft } from "../lib/utils";
 import { clearAll, exportAll, importAll } from "../lib/storage";
+import { getSupabase } from "../lib/supabase";
+import { pushState } from "../lib/sync";
 import { GhostButton, GoldButton, InfoBox } from "./ui";
 
 interface Props {
   profile: CoupleProfile;
   onSave: (p: CoupleProfile) => void;
   onClose: () => void;
+  onSignOut?: (() => void) | null;
 }
 
 const CEREMONY_OPTIONS: { value: Ceremony; label: string }[] = [
@@ -17,7 +20,12 @@ const CEREMONY_OPTIONS: { value: Ceremony; label: string }[] = [
   { value: "misto", label: "Civil com celebração religiosa" },
 ];
 
-export default function Settings({ profile, onSave, onClose }: Props) {
+export default function Settings({
+  profile,
+  onSave,
+  onClose,
+  onSignOut,
+}: Props) {
   const [draft, setDraft] = useState<CoupleProfile>(profile);
   const [confirmReset, setConfirmReset] = useState(false);
   const [backupMsg, setBackupMsg] = useState<string | null>(null);
@@ -82,7 +90,16 @@ export default function Settings({ profile, onSave, onClose }: Props) {
     onClose();
   };
 
-  const reset = () => {
+  const reset = async () => {
+    // Se houver sessão na cloud, apaga também o registo remoto antes de recarregar.
+    try {
+      const sb = getSupabase();
+      const { data } = (await sb?.auth.getSession()) ?? { data: null };
+      const userId = data?.session?.user.id;
+      if (sb && userId) await pushState(userId, {});
+    } catch {
+      /* segue mesmo assim */
+    }
     clearAll();
     window.location.reload();
   };
@@ -232,6 +249,22 @@ export default function Settings({ profile, onSave, onClose }: Props) {
           )}
         </div>
 
+        {/* Sessão */}
+        {onSignOut && (
+          <div className="mt-6 border-t border-line pt-5">
+            <button
+              onClick={() => {
+                onSignOut();
+                onClose();
+              }}
+              className="flex items-center gap-2 text-sm font-medium text-ink hover:text-gold-dark"
+            >
+              <LogOut size={15} />
+              Terminar sessão
+            </button>
+          </div>
+        )}
+
         {/* Zona de reset */}
         <div className="mt-6 border-t border-line pt-5">
           {!confirmReset ? (
@@ -250,7 +283,7 @@ export default function Settings({ profile, onSave, onClose }: Props) {
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={reset}
+                  onClick={() => void reset()}
                   className="rounded-lg bg-urgency-overdue px-4 py-2 text-sm font-semibold text-white hover:brightness-105"
                 >
                   Sim, apagar tudo
